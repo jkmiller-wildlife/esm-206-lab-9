@@ -42,7 +42,7 @@ library(stargazer)
 
 # a. Read in data as 'homes':
 
-homes <- read.csv("slo_homes.csv")
+homes <- read_csv("slo_homes.csv")
 
 # 781 obs of 7 variables
 
@@ -114,8 +114,19 @@ Use summary() to view the model output and statistics.
 
 # a. Saturated model: 
 
+homes_lm1 <- lm(Price ~ City + Bedrooms + Bathrooms + SqFt + PricePerSqFt + Status, data = homes_sub)
+
+# NOTE: This is bad. PricePerSqFt makes no sense to use because it is caluculated from the Price. Get into a feedback loop. Calculated from dependent variable Price. Can lead to biased overfiting of model results. Colinearity.
+
+# When coefficients make no sense, perhaps one of the variables that is highly correlated (like PricePerSqFt) is throwing it off. Pick one variable of multiple variables that are essentially telling you the same thing. 
+
+# Either pick the best one or aggregate them into a new combined variable.
+
+# Bedrooms, Bathrooms, and SqFt are essentially telling the same thing. House size.
 
 # b. Model summary:
+
+summary(homes_lm1)
 
 ```
 
@@ -125,7 +136,13 @@ The next model: Exclude price per square foot, and bedrooms/bathrooms (since the
 
 # a. Updated model with variables City, SqFt, and Status:
 
+homes_lm2 <- lm(Price ~ City + SqFt + Status, data = homes_sub)
+
+homes_lm2
+
 # b. Model summary:
+
+summary(homes_lm2)
 
 ```
 
@@ -134,20 +151,23 @@ Wait...but what if I wanted everything to be with respect to a Regular sale stat
 ```{r fct_relevel}
 
 # a. Set Status to class 'factor'
-
+homes_sub$Status <- factor(homes_sub$Status)
 
 # b. Check to ensure it's a factor now
-
+# Use class() to check!
 
 # c. Check levels:
-
+levels(homes_sub$Status)
 
 # d. Reassign reference level of "Status" to "Regular":
-
+homes_sub$Status <- fct_relevel(homes_sub$Status, "Regular")
 
 # e. Now run the regression again - same equation, but now the reference level is different (Status = Regular): 
 
+homes_lm3 <- lm(Price ~ City + SqFt + Status, data = homes_sub)
 
+homes_lm3
+summary(homes_lm3)
 
 ```
 
@@ -164,6 +184,10 @@ Then we can evaluate model diagnostics using the plot() function:
 
 # a. Model diagnostics:
 
+plot(homes_lm3)
+
+# Overall, heteroscedasticity is OK, residuals normality definitely looks good, and conceptually and mathematically my model is making sense!
+
 ```
 
 ###6. Model comparison by Akaike Information Criterion
@@ -174,7 +198,12 @@ The AIC is a quantitative metric for model "optimization" that balances complexi
 
 # a. AIC values for each model
 
+sat_aic <- AIC(homes_lm1)
+final_aic <- AIC(homes_lm3)
+
 # Answer: which would you pick? 
+# I would still pick homes_lm3 because: # Overall, heteroscedasticity is OK, residuals normality definitely looks good, and conceptually and mathematically my model is making sense!
+
 
 ```
 
@@ -184,7 +213,9 @@ The AIC is a quantitative metric for model "optimization" that balances complexi
 
 # a. Prepare a nice regression table:
 
+lm_table <- stargazer(homes_lm1, homes_lm3, type = "html")
 
+#lm_table
 
 # Note: If you want to work with this in Word, save to html, open, copy and paste into Word. 
 
@@ -236,9 +267,14 @@ Make predictions for the new data using predict():
 
 # a. Make predictions using the new data frame:
 
+price_predict <- predict(homes_lm3, 
+                         newdata = df_new, 
+                         se.fit = TRUE, 
+                         interval = "confidence")
+
 # b. Bind predictions to the data to make it actually useful:
 
-
+predict_df <- data.frame(df_new, price_predict) # Combines columns as long as same number of rows.
 
 ```
 
@@ -248,6 +284,11 @@ Then visualize it!
 
 # Create a line graph with square footage on the x-axis, predicted price on y-axis, with color dependent on City and facet_wrapped by sale status (follow along):
 
+predict_graph <- ggplot(predict_df, aes(x = SqFt, y = fit.fit)) +
+  geom_line(aes(color = City)) +
+  facet_wrap(~ Status)
+
+predict_graph
 
 ```
 
